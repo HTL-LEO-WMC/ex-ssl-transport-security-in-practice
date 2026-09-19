@@ -1,0 +1,55 @@
+# Traefik gets its certificate from an ACME server via the HTTP-01 challenge.
+# The ACME server is Pebble - Let's Encrypt's own test server - so the whole
+# dance runs on your laptop, without a public domain and without rate limits.
+
+services:
+
+  # Stands in for Let's Encrypt. Issues real certificates from a throwaway CA.
+  pebble:
+    image: "ghcr.io/letsencrypt/pebble:latest"
+    container_name: "pebble"
+    command: ["-config", "/test/config/pebble-config.json"]
+    environment:
+      - "PEBBLE_VA_NOSLEEP=1"        # validate immediately instead of waiting
+    ports:
+      - "15000:15000"                # management API - hands out the CA root
+    volumes:
+      - "./pebble/pebble-config.json:/test/config/pebble-config.json:ro"
+
+  traefik:
+    image: "traefik:v3.7"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.acme.acme.caserver=https://pebble:14000/dir"
+      - "--certificatesresolvers.acme.acme.email=student@htl-leonding.at"
+      - "--certificatesresolvers.acme.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.acme.acme.httpchallenge=true"
+      - "--certificatesresolvers.acme.acme.httpchallenge.entrypoint=web"
+    environment:
+      - "LEGO_CA_CERTIFICATES=/pebble.minica.pem"   # trust Pebble's own API certificate
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+      - "./pebble/pebble.minica.pem:/pebble.minica.pem:ro"
+    networks:
+      default:
+        aliases:
+          - "app.htl.test"           # so Pebble can reach the domain it validates
+
+  whoami:
+    image: "traefik/whoami"
+    container_name: "whoami"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`app.htl.test`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=acme"

@@ -1,0 +1,5 @@
+# Extensions the CA puts into the server certificate it signs
+subjectAltName      = DNS:localhost, IP:127.0.0.1
+basicConstraints    = CA:FALSE
+keyUsage            = critical, digitalSignature, keyEncipherment
+extendedKeyUsage    = serverAuth

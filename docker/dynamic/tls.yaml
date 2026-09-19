@@ -1,0 +1,8 @@
+# Dynamic configuration - Traefik watches this file and reloads it on change.
+# This is the only way to hand Traefik a certificate you made yourself.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/server.crt
+        keyFile: /certs/server.key
